@@ -87,7 +87,7 @@ To ensure thread safety and hardware stability:
 
 ## 5. Safety Mechanisms
 
-| Mechanism         | Purpose                                                        |
+| Mechanism         | Purpose                                                       |
 |-------------------|---------------------------------------------------------------|
 | ReentrantLock     | Prevents concurrent configuration operations                  |
 | waitForReaderIdle | Avoids sending commands while the reader is active            |

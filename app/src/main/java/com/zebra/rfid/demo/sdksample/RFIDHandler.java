@@ -349,7 +349,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
 
                 /// ///////////////////////////////////////
                 reader.Events.setHandheldEvent(true);
-                Log.d(TAG, "ECRT: Configuration, Default: Subscribe RFID Hardware Trigger Event");
+                Log.i(TAG, "==>1 Configuration, Default: Subscribe RFID Hardware Trigger Event");
 
                 reader.Events.setTagReadEvent(true);
                 reader.Events.setAttachTagDataWithReadEvent(false);
@@ -357,7 +357,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
                 /// ///////////////////////////////////////
                 reader.Events.setInventoryStartEvent(true);
                 reader.Events.setInventoryStopEvent(true);
-                Log.d(TAG, "ECRT: Configuration, subscript RFID Engine Start and Stop Event");
+                Log.i(TAG, "==>2 Configuration, subscribe RFID Engine Start and Stop Event");
                 reader.Events.setOperationEndSummaryEvent(true);
                 setupScannerSdk();
                 restoreDefaultTriggerConfig();
@@ -579,7 +579,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
     }
 
     private void logTriggerValues(ENUM_NEW_KEYLAYOUT_TYPE upper, ENUM_NEW_KEYLAYOUT_TYPE lower) {
-        Log.v(TAG, "### upper=" + upper.name() + ", lower=" + lower);
+        Log.v(TAG, "logTriggerValues upper=" + upper.name() + ", lower=" + lower);
     }
 
     private synchronized void dispose() {
@@ -680,6 +680,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
                     Log.i(TAG, "bRfidBusy changed: false -> true (INVENTORY_START_EVENT)");
                 }
                 bRfidBusy = true;
+                Log.i(TAG, "==>6 API Inventory Start Event, SET bRfidBusy");
                 if (context != null) context.dismissToast();
             } else if (eventType == STATUS_EVENT_TYPE.INVENTORY_STOP_EVENT) {
                 if (bRfidBusy) {
@@ -688,15 +689,19 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
                 bRfidBusy = false;
                 Log.v(TAG, "###5 API Inventory Stop Event, RFID Engine NOT BUSY and Ready for next command....");
                 if(context != null && context.getTestStatus()) {
+
                     if (!bSwitchFromRfidToBarcode) {
                         Log.i(TAG, "bSwitchFromRfidToBarcode changed: false -> true (test mode, switching to barcode)");
                     }
+                    Log.i(TAG, "==>7 SET bSwitchFromRfidToBarcode");
                     bSwitchFromRfidToBarcode = true;
                     //MUST DO This first to prevent trigger debounce
+                    Log.i(TAG, "==>8 CLEAR subscribeRfidHardwareTriggerEvents");
                     subscribeRfidHardwareTriggerEvents(false);
                     context.dismissToast();
                     context.showSnackbar("Pull Trigger: \r\nScan Barcode", false);
                     Log.v(TAG, "###6 testBarcode: switch both Hardware Triggers from RFID to Barcode Test...");
+                    Log.i(TAG, "==>9 Enter testBarcode()");
                     testBarcode();
                 }
             } else if (eventType == STATUS_EVENT_TYPE.OPERATION_END_SUMMARY_EVENT) {
@@ -732,6 +737,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
                         context.runOnUiThread(() -> context.showSnackbar("Ignored: RFID Busy", true));
                     }
                 } else {
+                    Log.i(TAG, "==>5 Hardware Trigger Pressed: Starting Inventory...");
                     Log.v(TAG, "###3 Hardware Trigger Pressed: Starting Inventory...");
                     if (context != null) context.handleTriggerPress(true);
                 }
@@ -746,8 +752,10 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
         if (context != null) {
             Log.v(TAG, "###7 testBarcode: switch from RFID to Barcode Trigger");
             Log.v(TAG, "STEP 1: subscribe RFID Hardware Trigger Events");
+            Log.i(TAG, "==>10 CLEAR subscribeRfidHardwareTriggerEvents");
             subscribeRfidHardwareTriggerEvents(false);
             Log.v(TAG, "STEP 2: Configure the Hardware Trigger as Barcode");
+            Log.i(TAG, "==>11 CLEAR setTriggerEnabled to configure the Hardware Trigger as Barcode");
             setTriggerEnabled(false);
         }
     }

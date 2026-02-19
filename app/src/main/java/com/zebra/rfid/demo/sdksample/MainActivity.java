@@ -327,8 +327,10 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
             showSnackbar("Default Trigger Settings", true);
             return true;
         } else if (id == R.id.auto) {
+            Log.i(TAG, "==>3 Test Trigger Switch -- RFID Trigger Enabled");
             Log.v(TAG, "###1 ECRT: RFID Trigger Enabled");
             bTestTriggerConfig = true;
+            Log.i(TAG, "==>4 Pull Trigger for RFID Operation");
             showSnackbar("Pull Trigger:\nRFID Operation\n\nBarcode Trigger Disabled", false);
             return true;
         }
@@ -448,11 +450,15 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
                 scanResultText.setText(getString(R.string.scan_result_label, val != null ? val : ""));
 
                 if(bTestTriggerConfig) {
+                    Log.i(TAG, "==>12 Received Barcode and Restore to RFID");
                     sendToast("Restore to RFID");
                     Log.v(TAG, "###8  Restore to RFID and Re-configure both Triggers back to RFID");
+                    Log.i(TAG, "==>13 SET subscribeRfidHardwareTriggerEvents");
                     rfidHandler.subscribeRfidHardwareTriggerEvents(true);
+                    Log.i(TAG, "==>14 SET RFID HW Trigger Config setTriggerEnabled");
                     rfidHandler.setTriggerEnabled(true);
                     bTestTriggerConfig = false;
+                    Log.i(TAG, "==>15 Wait for RFID Trigger and Start RFID Inventory");
                 }
             }
         });

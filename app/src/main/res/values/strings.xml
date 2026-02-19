@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">Trigger Sync RFD_P+</string>
+    <string name="action_settings">Settings</string>
+    <string name="trigger_rfid_rfid">Test Both Triggers as RFID</string>
+    <string name="trigger_barcode_barcode">Test Both Triggers as Barcode</string>
+    <string name="Defaults">Restore Default Settings</string>
+    <string name="bluetooth_permissions_not_granted">Bluetooth Permissions not granted</string>
+    <string name="connecting">Connecting</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="not_connected">Not connected</string>
+    <string name="default_settings_applied">Default settings applied</string>
+    <string name="failed_to_get_available_readers">Failed to get Available Readers</string>
+    <string name="failed_to_get_readers">Failed to get Readers</string>
+    <string name="no_available_readers_to_proceed">No Available Readers to proceed</string>
+    <string name="no_readers_found">No Readers Found</string>
+    <string name="failed_to_find_reader">Failed to find reader</string>
+    <string name="rfid_reader_disappeared">RFIDReaderDisappeared: %1$s</string>
+    <string name="connection_failed">Connection failed: %1$s</string>
+    <string name="scan_result_label">Scan Result : %1$s</string>
+    <string name="unique_tags">Unique Tags: %1$d</string>
+</resources>

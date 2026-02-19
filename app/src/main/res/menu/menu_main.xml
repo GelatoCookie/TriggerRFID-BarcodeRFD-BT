@@ -1,0 +1,29 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.zebra.rfid.demo.sdksample.MainActivity">
+
+    <item
+        android:id="@+id/auto"
+        android:title="RFID and Barcode Trigger Test"
+        app:showAsAction="never" />
+
+    <item
+        android:visibility="gone"
+        android:id="@+id/trigger_rfid_rfid"
+        android:title="@string/trigger_rfid_rfid"
+        app:showAsAction="never" />
+
+    <item
+        android:visibility="gone"
+        android:id="@+id/trigger_barcode_barcode"
+        android:title="@string/trigger_barcode_barcode"
+        app:showAsAction="never" />
+
+   <item
+        android:visibility="gone"
+        android:id="@+id/Default"
+        android:title="@string/Defaults"
+        app:showAsAction="never" />
+
+</menu>

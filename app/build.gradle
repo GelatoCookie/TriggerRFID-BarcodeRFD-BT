@@ -1,0 +1,80 @@
+plugins {
+    id 'com.android.application'
+}
+
+repositories {
+    flatDir {
+        dirs 'libs'
+    }
+}
+
+def gitVersion() {
+    try {
+        def process = "git rev-parse --short HEAD".execute(null, rootDir)
+        process.waitFor()
+        return process.in.text.trim()
+    } catch (e) {
+        return "N/A"
+    }
+}
+
+android {
+    namespace 'com.zebra.rfid.demo.sdksample'
+    compileSdkVersion 33
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    defaultConfig {
+        applicationId "com.zebra.rfid.demo.sdksample"
+        minSdkVersion 28
+        targetSdkVersion 33
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "GIT_VERSION", "\"" + gitVersion() + "\""
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation(name: 'API3_ASCII-release-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_CMN-release-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_INTERFACE-release-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_LLRP-release-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_NGE-protocolrelease-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_NGE-Transportrelease-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_NGEUSB-Transportrelease-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_READER-release-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_TRANSPORT-release-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_ZIOTC-release-2.0.5.238', ext: 'aar')
+    implementation(name: 'API3_ZIOTCTRANSPORT-release-2.0.5.238', ext: 'aar')
+    implementation(name: 'BarcodeScannerLibrary', ext: 'aar')
+    implementation(name: 'rfidhostlib', ext: 'aar')
+    implementation(name: 'rfidseriallib', ext: 'aar')
+    implementation 'androidx.appcompat:appcompat:1.3.0'
+    implementation 'com.google.android.material:material:1.4.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    implementation 'androidx.navigation:navigation-fragment:2.3.5'
+    implementation 'androidx.navigation:navigation-ui:2.3.5'
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.recyclerview:recyclerview:1.2.1'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+    implementation 'com.google.android.gms:play-services-location:18.0.0'
+    implementation 'com.google.code.gson:gson:2.8.7'
+}

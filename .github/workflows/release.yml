@@ -1,0 +1,31 @@
+name: Automated Release Notes
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'rc*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          echo "## $GITHUB_REF_NAME" > release_notes.md
+          echo >> release_notes.md
+          echo "### Highlights" >> release_notes.md
+          echo "- Modern UI, RFID, Barcode, CI, Docs" >> release_notes.md
+          echo >> release_notes.md
+          echo "### Changelog" >> release_notes.md
+          git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:'- %s' >> release_notes.md
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release_notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

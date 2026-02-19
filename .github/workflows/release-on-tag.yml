@@ -1,0 +1,39 @@
+name: Release on Tag
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python (for file manipulation)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Read release notes
+        id: notes
+        run: |
+          echo "Checking for release notes file..."
+          if [ -f RELEASE_NOTES.md ]; then
+            echo 'RELEASE_NOTES<<EOF' >> $GITHUB_ENV
+            cat RELEASE_NOTES.md >> $GITHUB_ENV
+            echo 'EOF' >> $GITHUB_ENV
+          else
+            echo 'RELEASE_NOTES=No release notes found.' >> $GITHUB_ENV
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ env.RELEASE_NOTES }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

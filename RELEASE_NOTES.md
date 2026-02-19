@@ -3,6 +3,9 @@
 ## v1.0.0
 - Initial public release
 - Baseline for all future development
+- Includes full documentation (.md and .docx)
+- Stable integration with Zebra RFID and barcode SDKs
+- Deadlock-safe trigger switching and concurrency improvements
 
 ## v2.0.2 (2026-02-18)
 - Major release: Trigger Sync and deadlock-safe switching

@@ -1,4 +1,7 @@
+
 # Trigger Event Handling Design
+
+**Release: v1.0.0**
 
 ## Overview
 The RFIDHandler manages the Zebra RFID reader's hardware trigger for two modes:

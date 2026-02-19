@@ -1,4 +1,7 @@
+
 # DesignDoc: RFID Trigger Configuration & Event Subscription
+
+**Release: v1.0.0**
 
 ## Summary
 - RFIDHandler manages trigger for RFID and barcode modes

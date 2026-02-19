@@ -1,4 +1,7 @@
+
 # Trigger Sync & Deadlock-Safe Switching
+
+**Release: v1.0.0**
 
 ## Purpose
 Safely switch the RFD40 trigger between RFID inventory and barcode scanning modes, avoiding SDK errors and deadlocks.

@@ -1,4 +1,7 @@
+
 # Pull Request Template
+
+**Release: v1.0.0**
 
 ## Description
 Summary of the change and which issue is fixed.

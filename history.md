@@ -6,5 +6,9 @@
 - Updated all documentation for new architecture
 - Ready for dev2.0.2 tag and push
 
+## v1.0.0
+- Initial public release
+- Baseline for all future development
+
 ## Previous Releases
 See earlier release notes in `RELEASE_NOTES.md`

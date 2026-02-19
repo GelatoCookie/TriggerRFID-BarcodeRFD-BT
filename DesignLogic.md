@@ -1,4 +1,7 @@
+
 # RFIDHandler Trigger State Management: Design Logic
+
+**Release: v1.0.0**
 
 ## Overview
 This document describes the contract and logic for managing the trigger state transitions between RFID and Barcode modes in the `RFIDHandler` class. It focuses on the use of the `bRfidBusy` and `bSwitchFromRfidToBarcode` flags, and the correct sequence for event subscription and hardware configuration.

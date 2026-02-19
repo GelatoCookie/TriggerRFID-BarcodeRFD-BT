@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.0.0
+- Initial public release
+- Baseline for all future development
+
 ## v2.0.2 (2026-02-18)
 - Major release: Trigger Sync and deadlock-safe switching
 - Improved concurrency and lock-guarded trigger switching

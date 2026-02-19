@@ -1,4 +1,7 @@
+
 # RFID SDK Sample: Design Overview
+
+**Release: v1.0.0**
 
 ## Architecture
 - **MainActivity**: UI logic, user interaction, and RFID/Barcode event callbacks

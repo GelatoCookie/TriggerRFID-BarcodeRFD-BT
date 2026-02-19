@@ -1,4 +1,7 @@
+
 # Contributing
+
+**Release: v1.0.0**
 
 Thank you for your interest in contributing!
 

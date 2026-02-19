@@ -1,4 +1,7 @@
+
 # Issue Template
+
+**Release: v1.0.0**
 
 ## Description
 Describe the issue or feature request in detail.

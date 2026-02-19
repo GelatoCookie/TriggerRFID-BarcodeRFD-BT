@@ -1,4 +1,7 @@
+
 # RFID Trigger Configuration & Event Subscription
+
+**Release: v1.0.0**
 
 ## 1. Overview
 

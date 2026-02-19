@@ -7,7 +7,7 @@
 - Stable integration with Zebra RFID and barcode SDKs
 - Deadlock-safe trigger switching and concurrency improvements
 
-## v2.0.2 (2026-02-18)
+## Dev v2.0.2 (2026-02-18)
 - Major release: Trigger Sync and deadlock-safe switching
 - Improved concurrency and lock-guarded trigger switching
 - Updated all documentation for new architecture

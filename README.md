@@ -1,7 +1,7 @@
 
 # Zebra RFID SDK Sample Application
 
-**Release: v1.0.0**
+**Release: v1.1.0**
 
 This project demonstrates integration with the Zebra RFID API3 SDK and barcode scanning libraries for Android. It provides a reference for connecting to Zebra RFID readers, performing inventory operations, and handling barcode scans in a modern Android environment.
 
@@ -29,6 +29,7 @@ This project demonstrates integration with the Zebra RFID API3 SDK and barcode s
 - See `design.md` for architecture
 - See `Trigger_Sync_Doc.md` for trigger sync and concurrency
 - See `RELEASE_NOTES.md` and `history.md` for release info
+- See tag v1.1.0 for latest release
 
 ## License
 See LICENSE for details.

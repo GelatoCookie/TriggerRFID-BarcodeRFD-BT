@@ -9,21 +9,23 @@
         app:showAsAction="never" />
 
     <item
-        android:visibility="gone"
         android:id="@+id/trigger_rfid_rfid"
         android:title="@string/trigger_rfid_rfid"
         app:showAsAction="never" />
 
     <item
-        android:visibility="gone"
         android:id="@+id/trigger_barcode_barcode"
         android:title="@string/trigger_barcode_barcode"
         app:showAsAction="never" />
 
    <item
-        android:visibility="gone"
         android:id="@+id/Default"
         android:title="@string/Defaults"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/test_read_write_verify"
+        android:title="ReadRfid BarcodeInput WriteVerify"
         app:showAsAction="never" />
 
 </menu>

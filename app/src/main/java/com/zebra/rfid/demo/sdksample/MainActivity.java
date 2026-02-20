@@ -46,6 +46,8 @@ import java.util.concurrent.Executors;
  */
 public class MainActivity extends AppCompatActivity implements RFIDHandler.ResponseHandlerInterface {
 
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private volatile boolean bTestWriteResult = false;
     /**
      * Enables or disables the scan button.
      * @param enabled True to enable, false to disable.
@@ -66,72 +68,6 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
             if (btnStop != null) btnStop.setEnabled(isRunning);
         });
     }
-
-    // --- Test Loop Trigger Config ---
-    private int testLoopCount = 0;
-    private final int TEST_LOOP_MAX = 10;
-    private boolean isTestLoopRunning = false;
-    private boolean isWaitingForBarcode = false;
-
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-
-    private void testLoopSwitchTriggerConfig() {
-        if (isTestLoopRunning) {
-            showSnackbar("Test loop already running", true);
-            return;
-        }
-        isTestLoopRunning = true;
-        startRFIDTestLoop();
-        startRFIDTestLoop();
-    }
-
-    private void startRFIDTestLoop() {
-        executor.execute(() -> {
-            for(int i=0; i<3; i++) {
-
-                runOnUiThread(() -> {
-                    showSnackbar("RFID Trigger", true);
-                    startRfidTest();
-
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    handleTriggerPress(false);
-                    showSnackbar("Barcode Trigger", true);
-                    startBarcodeTest();
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-
-
-                });
-
-
-
-
-
-            }
-        });
-    }
-
-    private void startBarcodeTest() {
-        runOnUiThread(() -> {
-            rfidHandler.subscribeRfidHardwareTriggerEvents(false);
-            rfidHandler.setTriggerEnabled(false);
-        });
-    }
-
-    private void startRfidTest() {
-        runOnUiThread(() -> {
-            rfidHandler.subscribeRfidHardwareTriggerEvents(true);
-            rfidHandler.setTriggerEnabled(true);
-        });
-    }
-
     private static final String TAG = "RFID_SAMPLE MainActivity ";
     /**
      * List of tag IDs detected by the RFID reader.
@@ -166,6 +102,12 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
 
     private boolean bTestTriggerConfig = false;
 
+    private boolean bTest_ReadRfid_ConfigureBarcodeWriteRfidVerify_RestoreRFIDTrigger = false;
+
+    private boolean bPassed_SwitchTrigger = false;
+    private boolean bPassed_Read_Write_Verify = false;
+
+
     /**
      * Reference to the currently displayed snackbar for programmatic dismissal.
      */
@@ -180,9 +122,7 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
          */
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         setupUI();
-
         rfidHandler = new RFIDHandler();
         checkPermissionsAndInit();
     }
@@ -190,12 +130,16 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
     public boolean getTestStatus(){
         return bTestTriggerConfig;
     }
+    public boolean getIntegratedTestStatus(){ return bTest_ReadRfid_ConfigureBarcodeWriteRfidVerify_RestoreRFIDTrigger; }
 
     /**
      * Consolidates UI initialization and setup.
      */
     private void setupUI() {
         bTestTriggerConfig = false;
+        bTest_ReadRfid_ConfigureBarcodeWriteRfidVerify_RestoreRFIDTrigger = false;
+        bPassed_SwitchTrigger = false;
+        bPassed_Read_Write_Verify = false;
         String appName = getString(R.string.app_name);
         try {
             setTitle(appName + " (" + com.zebra.rfid.api3.BuildConfig.VERSION_NAME + ")");
@@ -259,6 +203,19 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
             }
             showProgress(status.contains(getString(R.string.connecting)));
         });
+    }
+
+    public void updateIntegratedTestStatus(String status){
+        if (statusTextViewRFID != null) {
+            if(bPassed_Read_Write_Verify)
+                statusTextViewRFID.setText("Passed: Read Write Verify");
+            else if (bPassed_SwitchTrigger)
+                statusTextViewRFID.setText("Passed: Switch Hardware Trigger:\nRFID and Barcode");
+            else
+                statusTextViewRFID.setText(status);
+
+            statusTextViewRFID.setTextColor(ContextCompat.getColor(this, R.color.purple_200));
+        }
     }
 
     private void showProgress(boolean show) {
@@ -327,12 +284,20 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
             showSnackbar("Default Trigger Settings", true);
             return true;
         } else if (id == R.id.auto) {
+            bTestTriggerConfig = false;
             Log.i(TAG, "==>3 Test Trigger Switch -- RFID Trigger Enabled");
             Log.v(TAG, "###1 ECRT: RFID Trigger Enabled");
             bTestTriggerConfig = true;
             Log.i(TAG, "==>4 Pull Trigger for RFID Operation");
             showSnackbar("Pull Trigger:\nRFID Operation\n\nBarcode Trigger Disabled", false);
             return true;
+        } else if (id == R.id.test_read_write_verify){
+            bPassed_Read_Write_Verify = false;
+            updateIntegratedTestStatus("Test Read RFID\nConfigure Trigger for Barcode Input\nWriteRFID-ReadBackVerify\nRestoreRFID-Trigger");
+            Log.i(TAG, "***1 Test Read RFID, Configure Trigger for Barcode Input-WriteRFID-ReadBackVerify-RestoreRFID-Trigger");
+            bTest_ReadRfid_ConfigureBarcodeWriteRfidVerify_RestoreRFIDTrigger = true;
+            Log.i(TAG, "***2 Pull Trigger for RFID Operation");
+            showSnackbar("Pull Trigger:\nRead RFID Tag\n\nBarcode Trigger Disabled", false);
         }
         return super.onOptionsItemSelected(item);
     }
@@ -447,18 +412,60 @@ public class MainActivity extends AppCompatActivity implements RFIDHandler.Respo
         runOnUiThread(() -> {
             if (isFinishing() || isDestroyed()) return;
             if (scanResultText != null) {
+                Log.d(TAG, "barcodeData = " + val);
                 scanResultText.setText(getString(R.string.scan_result_label, val != null ? val : ""));
-
                 if(bTestTriggerConfig) {
                     Log.i(TAG, "==>12 Received Barcode and Restore to RFID");
+
                     sendToast("Restore to RFID");
                     Log.v(TAG, "###8  Restore to RFID and Re-configure both Triggers back to RFID");
                     Log.i(TAG, "==>13 SET subscribeRfidHardwareTriggerEvents");
                     rfidHandler.subscribeRfidHardwareTriggerEvents(true);
                     Log.i(TAG, "==>14 SET RFID HW Trigger Config setTriggerEnabled");
-                    rfidHandler.setTriggerEnabled(true);
+                    if (rfidHandler.setTriggerEnabled(true)){
+                        updateIntegratedTestStatus("Retore Trigger Configure to RFID Only");
+                        bTestTriggerConfig = true;
+                    }
                     bTestTriggerConfig = false;
                     Log.i(TAG, "==>15 Wait for RFID Trigger and Start RFID Inventory");
+                }
+                else if (bTest_ReadRfid_ConfigureBarcodeWriteRfidVerify_RestoreRFIDTrigger){
+                    uiHandler.post(() -> {
+                        sendToast("Use Barcode Data Input to Write EPC to RFID");
+                    });
+                    bTestWriteResult = false;
+                    bTestWriteResult = rfidHandler.testWriteTag();
+                    if(bTestWriteResult) {
+                        uiHandler.post(() -> {
+                            showSnackbar("Done Write, Read back to verify RFID tag written status: \n1. Success restore RFID Trigger\n2. Fail: Retey Bacode Scan and Write RFID", true);
+                            updateIntegratedTestStatus("Write OK");
+                        });
+
+                        if (rfidHandler.verifyWriteTag()) {
+                            bTest_ReadRfid_ConfigureBarcodeWriteRfidVerify_RestoreRFIDTrigger = false;
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                            if (!rfidHandler.isbRfidBusy()) {
+                                uiHandler.post(() -> {
+                                    showSnackbar("Restore to RFID", true);
+                                    updateIntegratedTestStatus("Test Passed: read, write and verify OK");
+                                    rfidHandler.subscribeRfidHardwareTriggerEvents(false);
+                                    Log.i(TAG, "*** SET RFID HW Trigger Config setTriggerEnabled");
+                                    rfidHandler.setTriggerEnabled(true);
+                                    bPassed_Read_Write_Verify = true;
+                                });
+                            }
+                        } else{
+                            showSnackbar("Fail: Retry Bacode Scan and Write RFID", false);
+                        }
+                    }else{
+                        uiHandler.post(() -> {
+                            showSnackbar("Fail: Retry Bacode Scan and Write RFID", false);
+                        });
+                    }
                 }
             }
         });

@@ -9,6 +9,7 @@ import com.zebra.rfid.api3.ENUM_TRANSPORT;
 import com.zebra.rfid.api3.HANDHELD_TRIGGER_EVENT_TYPE;
 import com.zebra.rfid.api3.IRFIDLogger;
 import com.zebra.rfid.api3.InvalidUsageException;
+import com.zebra.rfid.api3.MEMORY_BANK;
 import com.zebra.rfid.api3.OperationFailureException;
 import com.zebra.rfid.api3.RFIDReader;
 import com.zebra.rfid.api3.RFIDResults;
@@ -18,6 +19,7 @@ import com.zebra.rfid.api3.RfidEventsListener;
 import com.zebra.rfid.api3.RfidReadEvents;
 import com.zebra.rfid.api3.RfidStatusEvents;
 import com.zebra.rfid.api3.STATUS_EVENT_TYPE;
+import com.zebra.rfid.api3.TagAccess;
 import com.zebra.rfid.api3.TagData;
 import com.zebra.scannercontrol.DCSSDKDefs;
 import com.zebra.scannercontrol.DCSScannerInfo;
@@ -52,15 +54,47 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
     private static final String READER_NAME = "RFD4031-G10B700-WR";
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private int connectionTimer = 0;
+
+    /**
+     * DESIGN FLOW: test_read_write_verify (Integrated Test Mode)
+     *
+     * This mode demonstrates a complex state machine transition between RFID and Barcode hardware modes.
+     *
+     * Phase 1: RFID Read (Initial State)
+     *   - User initiates test via UI (MainActivity sets its internal integrated test flag).
+     *   - bRfidBusy = false, bSwitchFromRfidToBarcode = false.
+     *   - User pulls trigger -> RFID Inventory starts (bRfidBusy = true).
+     *   - User releases trigger -> RFID Inventory stops.
+     *
+     * Phase 2: Transition to Barcode Input
+     *   - On INVENTORY_STOP_EVENT:
+     *     a. bRfidBusy becomes false.
+     *     b. bSwitchFromRfidToBarcode is set to true (blocks further RFID trigger events).
+     *     c. subscribeRfidHardwareTriggerEvents(false) is called.
+     *     d. testBarcodeInputRfidWriteVerify() is invoked, which calls setTriggerEnabled(false).
+     *     e. setTriggerEnabled(false) physically reconfigures the reader's hardware trigger to SLED_SCAN (Barcode) mode.
+     *
+     * Phase 3: Barcode Scan & RFID Write/Verify
+     *   - User pulls trigger -> Hardware executes Barcode Scan (no RFID event generated).
+     *   - MainActivity.barcodeData() receives the result.
+     *   - RFIDHandler.testWriteTag() is called to write the scanned data (or test data) to a tag.
+     *     - Note: This uses writeWait(), which is a synchronous access operation.
+     *   - RFIDHandler.verifyWriteTag() is called to read back and confirm the write.
+     *
+     * Phase 4: Restoration
+     *   - If write/verify succeeds:
+     *     a. MainActivity resets its integrated test flag.
+     *     b. RFIDHandler.setTriggerEnabled(true) is called.
+     *     c. setTriggerEnabled(true) physically reconfigures the trigger back to RFID mode.
+     *     d. bSwitchFromRfidToBarcode is reset to false, allowing RFID trigger events again.
+     */
+
     /**
      * Indicates if the RFID reader is currently busy (e.g., inventory running).
      * Contract:
      *   - Set to true: On INVENTORY_START_EVENT (RFID operation begins).
      *   - Set to false: On INVENTORY_STOP_EVENT (RFID operation ends).
-     *   - Only updated by the event handler thread.
-     *   - Checked before configuration changes (e.g., setTriggerEnabled, restoreDefaultTriggerConfig).
-     *   - If true, configuration is rejected and UI is notified.
-     *   - All state changes are logged for debugging.
+     *   - Checked before configuration changes (e.g., setTriggerEnabled).
      */
     private volatile boolean bRfidBusy = false;
 
@@ -70,7 +104,6 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
      *   - Set to true: On INVENTORY_STOP_EVENT in test mode, before switching to barcode.
      *   - Set to false: When switching back to RFID mode (in setTriggerEnabled(true)).
      *   - Checked in event handler for HANDHELD_TRIGGER_EVENT; if true, RFID trigger events are ignored.
-     *   - All state changes are logged for debugging.
      */
     private volatile boolean bSwitchFromRfidToBarcode = false;
 
@@ -118,36 +151,6 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
         } else {
             connectReader();
         }
-    }
-
-    /**
-     * Handles resume event for the activity, reconnecting the reader if needed.
-     */
-    void onResume() {
-        executor.execute(() -> {
-            String result = connect();
-            if (context != null) {
-                context.updateReaderStatus(result, isReaderConnected());
-            }
-        });
-    }
-
-    /**
-     * Handles pause event for the activity, disconnecting the reader.
-     */
-    void onPause() {
-        executor.execute(this::disconnect);
-    }
-
-    /**
-     * Handles destroy event for the activity, disposing resources and shutting down executors.
-     */
-    void onDestroy() {
-        executor.execute(() -> {
-            dispose();
-            context = null;
-        });
-        executor.shutdown();
     }
 
     private void initSdk() {
@@ -308,12 +311,10 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
             } else {
                 return getConnectedStatus();
             }
-        } catch (InvalidUsageException e) {
+        } catch (InvalidUsageException | OperationFailureException e) {
             Log.e(TAG, CONNECTION_FAILED, e);
-            return context != null ? context.getString(R.string.connection_failed, e.getMessage()) : CONNECTION_FAILED;
-        } catch (OperationFailureException e) {
-            Log.e(TAG, CONNECTION_FAILED, e);
-            return context != null ? context.getString(R.string.connection_failed, e.getStatusDescription()) : CONNECTION_FAILED;
+            String error = (e instanceof InvalidUsageException) ? ((InvalidUsageException)e).getInfo() : ((OperationFailureException)e).getStatusDescription();
+            return context != null ? context.getString(R.string.connection_failed, error) : CONNECTION_FAILED;
         }
     }
 
@@ -381,13 +382,12 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
 
     /**
      * Restores the default trigger configuration, waiting for reader idle if necessary.
-     * @return True if successful, false otherwise.
      */
-    public boolean restoreDefaultTriggerConfig() {
+    public void restoreDefaultTriggerConfig() {
         resourceLock.lock();
         Log.d(TAG, "### restoreDefaultTriggerConfig");
         try {
-            if (reader == null || !reader.isConnected()) return false;
+            if (reader == null || !reader.isConnected()) return;
             
             try {
                 waitForReaderIdle();
@@ -399,7 +399,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
                 uiHandler.post(() -> {
                     if (context != null) context.showSnackbar(BUSY_RETRY_MESSAGE, false);
                 });
-                return false;
+                return;
             }
             try {
                 Log.v(TAG, "### Before Restore...");
@@ -415,11 +415,9 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
                 Log.v(TAG, "### After Restore...");
                 subscribeRfidHardwareTriggerEvents(true);//Enableq RFID Trigger Event by default after restore default trigger configuration
                 logTriggerValues(upperTriggerValue2, lowerTriggerValue2);
-                return true;
             } catch (InvalidUsageException | OperationFailureException e) {
                 Log.e(TAG, "Exception in restoreDefaultTriggerConfig", e);
             }
-            return false;
         } finally {
             resourceLock.unlock();
         }
@@ -459,9 +457,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
 
                 Log.v(TAG, "### after setTriggerEnabled: rfid=" + isRfidEnabled);
                 if (result == RFIDResults.RFID_API_SUCCESS) {
-                    Log.v(TAG, "#################################################");
                     Log.v(TAG, "Trigger configuration success: " + mode.name());
-                    Log.v(TAG, "#################################################");
 
                     // Design Doc: On success, calls subscribeRfidTriggerEvents(isRfidEnabled)
                     subscribeRfidHardwareTriggerEvents(isRfidEnabled);
@@ -493,7 +489,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
      * Waits for the bRfidBusy flag to be false, indicating the reader is idle.
      * @throws TimeoutException if the reader remains busy after the timeout period.
      */
-    private void waitForReaderIdle() throws TimeoutException {
+    public void waitForReaderIdle() throws TimeoutException {
         Log.d(TAG, "Waiting for reader idle...");
         for (int i = 0; i < 10; i++) {
             if (!bRfidBusy) {
@@ -579,7 +575,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
     }
 
     private void logTriggerValues(ENUM_NEW_KEYLAYOUT_TYPE upper, ENUM_NEW_KEYLAYOUT_TYPE lower) {
-        Log.v(TAG, "logTriggerValues upper=" + upper.name() + ", lower=" + lower);
+        Log.v(TAG, "logTriggerValues upper=" + (upper != null ? upper.name() : "null") + ", lower=" + (lower != null ? lower.name() : "null"));
     }
 
     private synchronized void dispose() {
@@ -599,7 +595,7 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
      */
     synchronized void performInventory() {
         if(bRfidBusy) {
-            Log.d(TAG, "RFID is busy, inventory request ignored.\r\n Abort!!!!");
+            Log.d(TAG, "RFID is busy, inventory request ignored. Abort!");
             stopInventory();
             return;
         }
@@ -618,7 +614,6 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
             if (reader != null && reader.isConnected()) reader.Actions.Inventory.stop();
         } catch (InvalidUsageException | OperationFailureException e) {
             Log.e(TAG, "Error stopping inventory", e);
-            Log.e(TAG, CONNECTION_FAILED, e);
         }
     }
 
@@ -676,88 +671,111 @@ class RFIDHandler implements Readers.RFIDReaderEventHandler {
                     dispose();
                 });
             } else if (eventType == STATUS_EVENT_TYPE.INVENTORY_START_EVENT) {
-                if (!bRfidBusy) {
-                    Log.i(TAG, "bRfidBusy changed: false -> true (INVENTORY_START_EVENT)");
-                }
                 bRfidBusy = true;
-                Log.i(TAG, "==>6 API Inventory Start Event, SET bRfidBusy");
+                Log.i(TAG, "bRfidBusy set to true (INVENTORY_START_EVENT)");
                 if (context != null) context.dismissToast();
             } else if (eventType == STATUS_EVENT_TYPE.INVENTORY_STOP_EVENT) {
-                if (bRfidBusy) {
-                    Log.i(TAG, "bRfidBusy changed: true -> false (INVENTORY_STOP_EVENT)");
-                }
                 bRfidBusy = false;
-                Log.v(TAG, "###5 API Inventory Stop Event, RFID Engine NOT BUSY and Ready for next command....");
+                Log.i(TAG, "bRfidBusy set to false (INVENTORY_STOP_EVENT)");
                 if(context != null && context.getTestStatus()) {
-
-                    if (!bSwitchFromRfidToBarcode) {
-                        Log.i(TAG, "bSwitchFromRfidToBarcode changed: false -> true (test mode, switching to barcode)");
-                    }
-                    Log.i(TAG, "==>7 SET bSwitchFromRfidToBarcode");
                     bSwitchFromRfidToBarcode = true;
-                    //MUST DO This first to prevent trigger debounce
-                    Log.i(TAG, "==>8 CLEAR subscribeRfidHardwareTriggerEvents");
                     subscribeRfidHardwareTriggerEvents(false);
                     context.dismissToast();
-                    context.showSnackbar("Pull Trigger: \r\nScan Barcode", false);
-                    Log.v(TAG, "###6 testBarcode: switch both Hardware Triggers from RFID to Barcode Test...");
-                    Log.i(TAG, "==>9 Enter testBarcode()");
+                    context.showSnackbar("Pull Trigger: \nScan Barcode", false);
                     testBarcode();
+                }
+                else if(context != null && context.getIntegratedTestStatus()){
+                    bSwitchFromRfidToBarcode = true;
+                    subscribeRfidHardwareTriggerEvents(false);
+                    context.showSnackbar("Pull Trigger: \nScan Barcode for write tag data input", false);
+                    testBarcodeInputRfidWriteVerify();
                 }
             } else if (eventType == STATUS_EVENT_TYPE.OPERATION_END_SUMMARY_EVENT) {
                 Log.d(TAG, "Operation End Summary Event");
             }
-            else {
-                Log.d(TAG, "Unhandled status event: " + eventType);
-            }
         }
-    /**
-     * Test Mode Documentation:
-     *
-     * When the application is in test mode (context.getTestStatus() == true):
-     *   - On INVENTORY_STOP_EVENT, bSwitchFromRfidToBarcode is set to true and logged.
-     *   - subscribeRfidHardwareTriggerEvents(false) is called to prevent RFID logic from handling trigger events.
-     *   - The UI is notified to scan a barcode.
-     *   - testBarcode() is called, which disables RFID trigger events and sets the hardware trigger to barcode mode.
-     *   - When switching back to RFID mode (setTriggerEnabled(true)), bSwitchFromRfidToBarcode is reset to false and logged.
-     *
-     * This ensures robust and predictable trigger event handling when toggling between RFID and Barcode modes in test scenarios.
-     */
 
         private void handleTriggerEvent(RfidStatusEvents rfidStatusEvents) {
             if (rfidStatusEvents.StatusEventData.HandheldTriggerEventData == null) return;
-            Log.v(TAG, "### handleTriggerEvent for hardware trigger event...");
             HANDHELD_TRIGGER_EVENT_TYPE triggerEvent = rfidStatusEvents.StatusEventData.HandheldTriggerEventData.getHandheldEvent();
             boolean isPressed = (triggerEvent == HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_PRESSED);
 
             if (isPressed) {
                 if (bRfidBusy) {
-                    Log.d(TAG, "Ignored Trigger Press: RFID is already busy.");
                     if (context != null) {
                         context.runOnUiThread(() -> context.showSnackbar("Ignored: RFID Busy", true));
                     }
                 } else {
-                    Log.i(TAG, "==>5 Hardware Trigger Pressed: Starting Inventory...");
-                    Log.v(TAG, "###3 Hardware Trigger Pressed: Starting Inventory...");
                     if (context != null) context.handleTriggerPress(true);
                 }
             } else {
-                Log.v(TAG, "###4 Hardware Trigger Released: Stopping Inventory...");
                 if (context != null) context.handleTriggerPress(false);
             }
         }
     }
 
     void testBarcode(){
-        if (context != null) {
-            Log.v(TAG, "###7 testBarcode: switch from RFID to Barcode Trigger");
-            Log.v(TAG, "STEP 1: subscribe RFID Hardware Trigger Events");
-            Log.i(TAG, "==>10 CLEAR subscribeRfidHardwareTriggerEvents");
-            subscribeRfidHardwareTriggerEvents(false);
-            Log.v(TAG, "STEP 2: Configure the Hardware Trigger as Barcode");
-            Log.i(TAG, "==>11 CLEAR setTriggerEnabled to configure the Hardware Trigger as Barcode");
-            setTriggerEnabled(false);
+        subscribeRfidHardwareTriggerEvents(false);
+        setTriggerEnabled(false);
+    }
+
+    void testBarcodeInputRfidWriteVerify(){
+        subscribeRfidHardwareTriggerEvents(false);
+        setTriggerEnabled(false);
+    }
+
+    public boolean testWriteTag() {
+        String writeData = "111122223333444455556666";
+        String sourceEPC = "111122223333444455556666";
+        boolean isSuccess = false;
+        if (bRfidBusy || reader == null)
+            return false;
+        try {
+            TagAccess.WriteAccessParams writeAccessParams = new TagAccess().new WriteAccessParams();
+            writeAccessParams.setAccessPassword(0);
+            writeAccessParams.setMemoryBank(MEMORY_BANK.MEMORY_BANK_EPC);
+            writeAccessParams.setOffset(2); // start writing from word offset 0
+            writeAccessParams.setWriteData(writeData);
+            writeAccessParams.setWriteDataLength(writeData.length() / 4);
+            writeAccessParams.setWriteRetries(3);
+            TagData tagData = new TagData();
+            reader.Actions.TagAccess.writeWait(sourceEPC, writeAccessParams, null, tagData, false, false);
+            if(tagData.getNumberOfWords() == 6){
+                Log.d(TAG, "ECRT: Test Passed: write");
+                isSuccess = true;
+            }
+            else{
+                Log.d(TAG, "ECRT: Test Failed: Partial Written = " + tagData.getNumberOfWords());
+            }
+        } catch (InvalidUsageException | OperationFailureException e) {
+            Log.e(TAG, "writeTag failed", e);
         }
+        return isSuccess;
+    }
+
+    public boolean verifyWriteTag() {
+        if (context == null || reader == null) return false;
+        Log.i(TAG, "*** verifyWriteTag: reading back to verify");
+        context.updateIntegratedTestStatus("Verify...");
+        TagAccess.ReadAccessParams readAccessParams = new TagAccess().new ReadAccessParams();
+        readAccessParams.setAccessPassword(0);
+        readAccessParams.setMemoryBank(MEMORY_BANK.MEMORY_BANK_EPC);
+        readAccessParams.setOffset(2);
+        String sourceEPC = "111122223333444455556666";
+
+        try {
+            TagData tagData = reader.Actions.TagAccess.readWait(sourceEPC, readAccessParams, null, false);
+            if(tagData != null && "111122223333444455556666".equals(tagData.getTagID())) {
+                Log.d(TAG, "ECRT: Test Passed: Verify");
+                context.showSnackbar("TEST PASSED", false);
+                return true;
+            } else {
+                Log.d(TAG, "ECRT: Test Failed: Verify");
+            }
+        } catch (InvalidUsageException | OperationFailureException e) {
+            Log.e(TAG, "verifyWriteTag failed", e);
+        }
+        return false;
     }
 
     /**
